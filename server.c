@@ -55,7 +55,9 @@ void *handle_client(void *arg) {
         close(client);
         return NULL;
     }
-
+    char *ok = "Welcome to the chat!\n";
+    send(client, ok, strlen(ok), 0);
+    
     // Add client
     pthread_mutex_lock(&lock);
     int index = -1;
