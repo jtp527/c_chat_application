@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <netinet/in.h>
+#include <time.h>
 
 #define PORT 12345
 #define MAX_CLIENTS 5
@@ -11,6 +12,13 @@
 int clients[MAX_CLIENTS];
 char usernames[MAX_CLIENTS][32];
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+// Get current time as [HH:MM]
+void get_time(char *buffer, size_t size) {
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    strftime(buffer, size, "[%H:%M]", tm_info);
+}
 
 void send_to_all(char *msg, int sender) {
     pthread_mutex_lock(&lock);
@@ -27,13 +35,33 @@ void *handle_client(void *arg) {
     free(arg);
 
     char name[32];
-    recv(client, name, sizeof(name), 0); // get username
+    recv(client, name, sizeof(name), 0);
+    name[strcspn(name, "\n")] = 0;
 
-    // Save username
+    // Check for duplicate username
+    int name_taken = 0;
+    pthread_mutex_lock(&lock);
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i] != 0 && strcmp(usernames[i], name) == 0) {
+            name_taken = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&lock);
+
+    if (name_taken) {
+        char *msg = "Username taken. Try another.\n";
+        send(client, msg, strlen(msg), 0);
+        close(client);
+        return NULL;
+    }
+
+    // Add client
     pthread_mutex_lock(&lock);
     int index = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i] == client) {
+        if (clients[i] == 0) {
+            clients[i] = client;
             strcpy(usernames[i], name);
             index = i;
             break;
@@ -41,35 +69,44 @@ void *handle_client(void *arg) {
     }
     pthread_mutex_unlock(&lock);
 
-    // Send join message
+    // Announce join
+    char timebuf[16];
     char join_msg[128];
-    sprintf(join_msg, "%s joined the chat.\n", name);
+    get_time(timebuf, sizeof(timebuf));
+    sprintf(join_msg, "%s %s joined the chat.\n", timebuf, name);
     send_to_all(join_msg, client);
     printf("%s", join_msg);
 
-    // Receive messages
+    // Chat loop
     char msg[512];
     while (1) {
         int bytes = recv(client, msg, sizeof(msg) - 1, 0);
         if (bytes <= 0) break;
         msg[bytes] = '\0';
 
+        if (strncmp(msg, "/quit", 5) == 0) {
+            break;
+        }
+
         char full_msg[600];
-        sprintf(full_msg, "[%s]: %s", name, msg);
+        get_time(timebuf, sizeof(timebuf));
+        sprintf(full_msg, "%s [%s]: %s", timebuf, name, msg);
         send_to_all(full_msg, client);
         printf("%s", full_msg);
     }
 
-    // Remove on disconnect
+    // Remove client
     pthread_mutex_lock(&lock);
     clients[index] = 0;
     usernames[index][0] = '\0';
     pthread_mutex_unlock(&lock);
 
+    get_time(timebuf, sizeof(timebuf));
     char leave_msg[128];
-    sprintf(leave_msg, "%s left the chat.\n", name);
+    sprintf(leave_msg, "%s %s left the chat.\n", timebuf, name);
     send_to_all(leave_msg, client);
     printf("%s", leave_msg);
+
     close(client);
     return NULL;
 }
@@ -89,24 +126,6 @@ int main() {
         struct sockaddr_in client_addr;
         socklen_t len = sizeof(client_addr);
         int client = accept(server, (struct sockaddr *)&client_addr, &len);
-
-        pthread_mutex_lock(&lock);
-        int added = 0;
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (clients[i] == 0) {
-                clients[i] = client;
-                added = 1;
-                break;
-            }
-        }
-        pthread_mutex_unlock(&lock);
-
-        if (!added) {
-            char *full = "Server full.\n";
-            send(client, full, strlen(full), 0);
-            close(client);
-            continue;
-        }
 
         int *pclient = malloc(sizeof(int));
         *pclient = client;

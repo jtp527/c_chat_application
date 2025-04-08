@@ -30,24 +30,45 @@ int main() {
 
     connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 
-    // Enter username
+    // Username
     char name[32];
     printf("Enter your name: ");
     fgets(name, sizeof(name), stdin);
     name[strcspn(name, "\n")] = 0;
     send(sock, name, strlen(name), 0);
 
-    // Start thread to receive messages
+    // Wait for reply
+    char reply[128];
+    int bytes = recv(sock, reply, sizeof(reply) - 1, 0);
+    if (bytes <= 0) {
+        printf("Disconnected before confirmation.\n");
+        close(sock);
+        return 1;
+    }
+    reply[bytes] = '\0';
+    if (strstr(reply, "Username taken") != NULL) {
+        printf("%s", reply);
+        close(sock);
+        return 1;
+    }
+
+    printf("Connected to server! Type /quit to leave.\n");
+
     pthread_t t;
     pthread_create(&t, NULL, receive, NULL);
 
-    // Send messages
+    // Chat loop
     char msg[512];
     while (1) {
         fgets(msg, sizeof(msg), stdin);
+        if (strncmp(msg, "/quit", 5) == 0) {
+            send(sock, "/quit", 5, 0);
+            break;
+        }
         send(sock, msg, strlen(msg), 0);
     }
 
     close(sock);
+    printf("Disconnected.\n");
     return 0;
 }
