@@ -10,35 +10,42 @@
 
 int sock;
 
-void *receive_messages(void *arg) {
-    char buffer[1024];
+void *receive(void *arg) {
+    char msg[512];
     while (1) {
-        int bytes = recv(sock, buffer, sizeof(buffer) - 1, 0);
+        int bytes = recv(sock, msg, sizeof(msg) - 1, 0);
         if (bytes <= 0) break;
-        buffer[bytes] = '\0';
-        printf("Server echoed: %s", buffer);
+        msg[bytes] = '\0';
+        printf("%s", msg);
     }
     return NULL;
 }
 
 int main() {
     sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in server_addr = {0};
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 
-    connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    printf("Connected to server.\n");
+    // Enter username
+    char name[32];
+    printf("Enter your name: ");
+    fgets(name, sizeof(name), stdin);
+    name[strcspn(name, "\n")] = 0;
+    send(sock, name, strlen(name), 0);
 
-    pthread_t recv_thread;
-    pthread_create(&recv_thread, NULL, receive_messages, NULL);
+    // Start thread to receive messages
+    pthread_t t;
+    pthread_create(&t, NULL, receive, NULL);
 
-    char buffer[1024];
+    // Send messages
+    char msg[512];
     while (1) {
-        fgets(buffer, sizeof(buffer), stdin);
-        send(sock, buffer, strlen(buffer), 0);
+        fgets(msg, sizeof(msg), stdin);
+        send(sock, msg, strlen(msg), 0);
     }
 
     close(sock);
