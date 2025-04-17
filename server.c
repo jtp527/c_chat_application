@@ -30,15 +30,17 @@ void send_to_all(char *msg, int sender) {
     }
     pthread_mutex_unlock(&lock);
 }
-int validMessage(char *msg, int sender){
+int valid_message(char *msg, int sender){
     char* errormessage = "Invalid Input: Message must contain non-space characters.\n";
     pthread_mutex_lock(&lock);
     for (int i = 0; i < strlen(msg); ++i){
+        // Check if the character is whitespace
         if  (!isspace(msg[i])){
             pthread_mutex_unlock(&lock);
             return 0;
         }
     }
+    // If the message contains only whitespace, send an error message to the sender
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i] != 0 && clients[i] == sender) {
             send(clients[i],errormessage , strlen(errormessage), 0);
@@ -118,7 +120,8 @@ void *handle_client(void *arg) {
         char full_msg[600];
         get_time(timebuf, sizeof(timebuf));
         sprintf(full_msg, "%s [%s]: %s", timebuf, usernames[index], msg);
-        if (validMessage(msg, client) == 0){
+        if (valid_message(msg, client) == 0){
+            // If the message isn't ONLY whitespace, send it to all clients
             send_to_all(full_msg, client);
             printf("%s", full_msg);
         }
