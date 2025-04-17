@@ -118,16 +118,11 @@ void *handle_client(void *arg) {
         char full_msg[600];
         get_time(timebuf, sizeof(timebuf));
         sprintf(full_msg, "%s [%s]: %s", timebuf, usernames[index], msg);
-<<<<<<< HEAD
         if (validMessage(msg, client) == 0){
             send_to_all(full_msg, client);
             printf("%s", full_msg);
         }
         
-=======
-        send_to_all(full_msg, client);
-        printf("%s", full_msg);
->>>>>>> da7988c9ea73b3dd19415693a860ff1e8bf82a3c
     }
 
     // Remove client
