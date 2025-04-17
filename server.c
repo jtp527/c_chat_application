@@ -35,25 +35,31 @@ void *handle_client(void *arg) {
     free(arg);
 
     char name[32];
-    recv(client, name, sizeof(name), 0);
-    name[strcspn(name, "\n")] = 0;
-
-    // Check for duplicate username
-    int name_taken = 0;
-    pthread_mutex_lock(&lock);
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i] != 0 && strcmp(usernames[i], name) == 0) {
-            name_taken = 1;
-            break;
+    while (1) {
+        memset(name, 0, sizeof(name));                        // Clear buffer
+        int bytes = recv(client, name, sizeof(name), 0);      // Receive username
+        if (bytes <= 0) {
+            close(client);
+            return NULL;
         }
-    }
-    pthread_mutex_unlock(&lock);
+        name[strcspn(name, "\n")] = 0;                         // Remove newline
 
-    if (name_taken) {
-        char *msg = "Username taken. Try another.\n";
-        send(client, msg, strlen(msg), 0);
-        close(client);
-        return NULL;
+        int name_taken = 0;
+        pthread_mutex_lock(&lock);
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (clients[i] != 0 && strcmp(usernames[i], name) == 0) {
+                name_taken = 1;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&lock);
+
+        if (name_taken) {
+            char *msg = "Username taken. Try another:\n";
+            send(client, msg, strlen(msg), 0);                // Ask for another
+        } else {
+            break; // Valid username
+        }
     }
     char *ok = "Welcome to the chat!\n";
     send(client, ok, strlen(ok), 0);
@@ -75,7 +81,7 @@ void *handle_client(void *arg) {
     char timebuf[16];
     char join_msg[128];
     get_time(timebuf, sizeof(timebuf));
-    sprintf(join_msg, "%s %s joined the chat.\n", timebuf, name);
+    sprintf(join_msg, "%s %s joined the chat.\n", timebuf, usernames[index]);
     send_to_all(join_msg, client);
     printf("%s", join_msg);
 
@@ -92,22 +98,23 @@ void *handle_client(void *arg) {
 
         char full_msg[600];
         get_time(timebuf, sizeof(timebuf));
-        sprintf(full_msg, "%s [%s]: %s", timebuf, name, msg);
+        sprintf(full_msg, "%s [%s]: %s", timebuf, usernames[index], msg);
         send_to_all(full_msg, client);
         printf("%s", full_msg);
     }
 
     // Remove client
+    get_time(timebuf, sizeof(timebuf));
+    char leave_msg[128];
+    sprintf(leave_msg, "%s %s left the chat.\n", timebuf, usernames[index]);
+    send_to_all(leave_msg, client);
+    printf("%s", leave_msg);
+
     pthread_mutex_lock(&lock);
     clients[index] = 0;
     usernames[index][0] = '\0';
     pthread_mutex_unlock(&lock);
 
-    get_time(timebuf, sizeof(timebuf));
-    char leave_msg[128];
-    sprintf(leave_msg, "%s %s left the chat.\n", timebuf, name);
-    send_to_all(leave_msg, client);
-    printf("%s", leave_msg);
 
     close(client);
     return NULL;

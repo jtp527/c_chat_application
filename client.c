@@ -31,25 +31,27 @@ int main() {
     connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 
     // Username
-    char name[32];
-    printf("Enter your name: ");
-    fgets(name, sizeof(name), stdin);
-    name[strcspn(name, "\n")] = 0;
-    send(sock, name, strlen(name), 0);
+    char name[32], reply[128];
 
-    // Wait for reply
-    char reply[128];
-    int bytes = recv(sock, reply, sizeof(reply) - 1, 0);
-    if (bytes <= 0) {
-        printf("Disconnected before confirmation.\n");
-        close(sock);
-        return 1;
-    }
-    reply[bytes] = '\0';
-    if (strstr(reply, "Username taken") != NULL) {
-        printf("%s", reply);
-        close(sock);
-        return 1;
+    while (1) {
+        printf("Enter your name: ");
+        fgets(name, sizeof(name), stdin);
+        name[strcspn(name, "\n")] = 0;
+        send(sock, name, strlen(name), 0);
+
+        int bytes = recv(sock, reply, sizeof(reply) - 1, 0);
+        if (bytes <= 0) {
+            printf("Disconnected before confirmation.\n");
+            close(sock);
+            return 1;
+        }
+        reply[bytes] = '\0';
+        printf("%s", reply);  // Always print server's message
+
+        if (strstr(reply, "Welcome") != NULL) {
+            break; // Valid name accepted
+        }
+        // else, retry
     }
 
     printf("Connected to server! Type /quit to leave.\n");
