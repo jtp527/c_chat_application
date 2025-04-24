@@ -49,7 +49,7 @@ int valid_message(char *msg, int sender){
     pthread_mutex_unlock(&lock);
     return 1;
 }
-        
+
 
 void *handle_client(void *arg) {
     int client = *(int *)arg;
@@ -78,7 +78,13 @@ void *handle_client(void *arg) {
         if (name_taken) {
             char *msg = "Username taken. Try another:\n";
             send(client, msg, strlen(msg), 0);                // Ask for another
-        } else {
+        }
+        else if (valid_message(name, client) == 1) {
+            // If the message isn't ONLY whitespace, send it to client
+            char *msg = "Invalid Input: Username must contain non-space characters.\n";
+            send(client, msg, strlen(msg), 0);                // Ask for another
+        } 
+        else {
             break; // Valid username
         }
     }
