@@ -47,8 +47,8 @@ class ChatClient:
     def send_message(self, event=None):
         message = self.input_box.get()
         if message:
-            timestamp = datetime.now().strftime('%H:%M:%S')
-            formatted = f"[{timestamp}] You: {message}"
+            timestamp = datetime.now().strftime('%H:%M')
+            formatted = f"[{timestamp}] You:{message}"
             self.show_message(formatted)
             try:
                 self.client_socket.send(message.encode())
@@ -65,9 +65,8 @@ class ChatClient:
                     self.show_message("Server disconnected.")
                     break
                 message = data.decode()
-                timestamp = datetime.now().strftime('%H:%M:%S')
-                formatted = f"[{timestamp}] {message}"
-                self.show_message(formatted)
+            
+                self.show_message(message)
             except:
                 break
         self.client_socket.close()
