@@ -65,30 +65,48 @@ class ChatClient:
         self.status.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _attempt_connect(self):
-        # Try to connect and update UI
-        if self._connect():
-            self.status.config(text="Connected")
-            self.running = True
-            self.input_box.config(state='normal')
-            self.disconnect_button.config(state='normal')
-            self.reconnect_button.config(state='disabled')
-            self._start_receiver()
-        else:
-            self.show_message("Unable to connect to server.")
-            self.status.config(text="Disconnected")
-            self.disconnect_button.config(state='disabled')
-            self.reconnect_button.config(state='normal')
+        # Try handshake until valid or cancel
+        while True:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.connect((HOST, PORT))
+            except Exception:
+                self.show_message("Unable to reach server.")
+                sock.close()
+                return
 
-    def _connect(self):
-        try:
-            self.client_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
-            self.client_socket.connect((HOST, PORT))
-            # Send username to the server
-            self.client_socket.send(self.username.encode())
-            return True
-        except Exception:
-            return False
+            # send username and wait server response
+            sock.send(self.username.encode())
+            try:
+                resp = sock.recv(1024).decode().strip()
+            except Exception:
+                self.show_message("Handshake failed.")
+                sock.close()
+                return
+
+            # check response
+            if resp.startswith("Welcome"):
+                self.client_socket = sock
+                self.show_message(resp)
+                break
+            else:
+                # show error and prompt new username
+                self.show_message(resp)
+                sock.close()
+                new_name = simpledialog.askstring(
+                    "Username Error", resp + "\nEnter another username:",
+                    parent=self.master)
+                if not new_name:
+                    return
+                self.username = new_name
+
+        # On successful handshake
+        self.status.config(text="Connected")
+        self.running = True
+        self.input_box.config(state='normal')
+        self.disconnect_button.config(state='normal')
+        self.reconnect_button.config(state='disabled')
+        self._start_receiver()
 
     def _start_receiver(self):
         thread = threading.Thread(
@@ -126,6 +144,7 @@ class ChatClient:
                 if not data:
                     self.show_message("Server disconnected.")
                     break
+
                 buffer += data.decode()
 
                 while '\n' in buffer:
@@ -134,24 +153,24 @@ class ChatClient:
                     if line:
                         self.show_message(line)
                         self.master.bell()
-
             except Exception:
                 break
 
+        # Clean up on disconnect
         self.disconnect(silent=True)
 
     def disconnect(self, silent=False):
-        # Stop receiving and notify server
+        # notify server and close
         if self.running:
             try:
                 self.client_socket.send(b"/quit")
-            except Exception:
-                pass
+            except: pass
         self.running = False
         try:
+            self.client_socket.shutdown(socket.SHUT_RDWR)
             self.client_socket.close()
-        except Exception:
-            pass
+        except: pass
+
         self.status.config(text="Disconnected")
         self.input_box.config(state='disabled')
         self.disconnect_button.config(state='disabled')
@@ -160,12 +179,10 @@ class ChatClient:
             self.show_message("Disconnected from server.")
 
     def reconnect(self):
-        # Attempt reconnection
         self.show_message("Reconnecting...")
         self._attempt_connect()
 
     def on_close(self):
-        # Ensure server is notified before exit
         self.disconnect(silent=True)
         self.master.destroy()
 
