@@ -111,7 +111,6 @@ void *handle_client(void *arg) {
     sprintf(join_msg, "%s %s joined the chat.\n", timebuf, usernames[index]);
     send_to_all(join_msg, client);
     printf("%s", join_msg);
-    fflush(stdout);
 
     // Chat loop
     char msg[512];
@@ -126,12 +125,11 @@ void *handle_client(void *arg) {
 
         char full_msg[600];
         get_time(timebuf, sizeof(timebuf));
-        sprintf(full_msg, "%s [%s]: %s\n", timebuf, usernames[index], msg);
+        sprintf(full_msg, "%s [%s]: %s \n", timebuf, usernames[index], msg);
         if (valid_message(msg, client) == 0){
             // If the message isn't ONLY whitespace, send it to all clients
             send_to_all(full_msg, client);
             printf("%s", full_msg);
-            fflush(stdout);
         }
         
     }
@@ -142,7 +140,6 @@ void *handle_client(void *arg) {
     sprintf(leave_msg, "%s %s left the chat.\n", timebuf, usernames[index]);
     send_to_all(leave_msg, client);
     printf("%s", leave_msg);
-    fflush(stdout);
 
     pthread_mutex_lock(&lock);
     clients[index] = 0;
