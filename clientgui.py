@@ -138,7 +138,7 @@ class ChatClient:
             except Exception:
                 break
 
-    self.disconnect(silent=True)
+        self.disconnect(silent=True)
 
     def disconnect(self, silent=False):
         # Stop receiving and notify server
