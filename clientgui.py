@@ -119,21 +119,25 @@ class ChatClient:
                 self.disconnect()
 
     def receive_messages(self):
+        buffer = ""
         while self.running:
             try:
                 data = self.client_socket.recv(1024)
                 if not data:
                     self.show_message("Server disconnected.")
                     break
-                message = data.decode().rstrip()
-                # Display server-supplied timestamp without adding another
-                self.show_message(message)
-                # Notify user of new message (bell)
-                self.master.bell()
+                buffer += data.decode()
+
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    line = line.rstrip()
+                    if line:
+                        self.show_message(line)
+                        self.master.bell()
+
             except Exception:
                 break
 
-        # Clean up on disconnect
         self.disconnect(silent=True)
 
     def disconnect(self, silent=False):
