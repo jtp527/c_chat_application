@@ -27,8 +27,17 @@ class ChatClient:
         # Prompt for username
         self.username = simpledialog.askstring(
             "Username", "Enter your username:", parent=self.master)
+        # If user cancelled
         if not self.username:
             return
+        # Enforce maximum length via same prompt style
+        while len(self.username) >= 32:
+            self.username = simpledialog.askstring(
+                "Username Error",
+                "Username must be less than 32 characters.\nEnter another username:",
+                parent=self.master)
+            if not self.username:
+                return
 
         # Chat display area
         self.chat_area = scrolledtext.ScrolledText(
@@ -65,7 +74,7 @@ class ChatClient:
         self.status.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _attempt_connect(self):
-        # Try handshake until valid or cancel
+        # Handshake loop with server validation
         while True:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -98,6 +107,14 @@ class ChatClient:
                     parent=self.master)
                 if not new_name:
                     return
+                # enforce length again
+                while len(new_name) >= 32:
+                    new_name = simpledialog.askstring(
+                        "Username Error",
+                        "Username must be less than 32 characters.\nEnter another username:",
+                        parent=self.master)
+                    if not new_name:
+                        return
                 self.username = new_name
 
         # On successful handshake
@@ -164,12 +181,14 @@ class ChatClient:
         if self.running:
             try:
                 self.client_socket.send(b"/quit")
-            except: pass
+            except:
+                pass
         self.running = False
         try:
             self.client_socket.shutdown(socket.SHUT_RDWR)
             self.client_socket.close()
-        except: pass
+        except:
+            pass
 
         self.status.config(text="Disconnected")
         self.input_box.config(state='disabled')
